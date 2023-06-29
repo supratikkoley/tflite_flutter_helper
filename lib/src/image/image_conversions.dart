@@ -54,41 +54,39 @@ class ImageConversions {
     return image;
   }
 
-  void convertImageToTensorBuffer(ui.Image image, TensorBuffer buffer) {
-  int w = image.width;
-  int h = image.height;
-  ByteData? byteData = image.toByteData();
-  if (byteData == null) {
-    throw StateError('Failed to convert image to byte data.');
+   static void convertImageToTensorBuffer(Image image, TensorBuffer buffer) {
+    int w = image.width;
+    int h = image.height;
+    List<int> intValues = image.getBytes();
+    int flatSize = w * h * 3;
+    List<int> shape = [h, w, 3];
+    switch (buffer.dataType) {
+      case TfLiteType.uint8:
+        List<int> byteArr = List.filled(flatSize, 0);
+        for (int i = 0, j = 0; i < intValues.length; i += 4) {
+          byteArr[j++] = getRed(intValues[i]);
+          byteArr[j++] = getGreen(intValues[i]);
+          byteArr[j++] = getBlue(intValues[i]);
+        }
+        buffer.loadList(byteArr, shape: shape);
+        break;
+      case TfLiteType.float32:
+        List<double> floatArr = List.filled(flatSize, 0.0);
+        for (int i = 0, j = 0; i < intValues.length; i += 4) {
+          floatArr[j++] = getRed(intValues[i]).toDouble();
+          floatArr[j++] = getGreen(intValues[i]).toDouble();
+          floatArr[j++] = getBlue(intValues[i]).toDouble();
+        }
+        buffer.loadList(floatArr, shape: shape);
+        break;
+      default:
+        throw StateError(
+            '${buffer.dataType} is unsupported with TensorBuffer.');
+    }
   }
-  List<int> intValues = byteData.buffer.asUint32List();
-  int flatSize = w * h * 3;
-  List<int> shape = [h, w, 3];
-  switch (buffer.dataType) {
-    case TfLiteType.uint8:
-      List<int> byteArr = List.filled(flatSize, 0);
-      for (int i = 0, j = 0; i < intValues.length; i++) {
-        final pixel = Color(intValues[i]).withOpacity(1.0);
-        byteArr[j++] = pixel.red;
-        byteArr[j++] = pixel.green;
-        byteArr[j++] = pixel.blue;
-      }
-      buffer.loadList(byteArr, shape: shape);
-      break;
-    case TfLiteType.float32:
-      List<double> floatArr = List.filled(flatSize, 0.0);
-      for (int i = 0, j = 0; i < intValues.length; i++) {
-        final pixel = Color(intValues[i]).withOpacity(1.0);
-        floatArr[j++] = pixel.red.toDouble();
-        floatArr[j++] = pixel.green.toDouble();
-        floatArr[j++] = pixel.blue.toDouble();
-      }
-      buffer.loadList(floatArr, shape: shape);
-      break;
-    default:
-      throw StateError(
-          '${buffer.dataType} is unsupported with TensorBuffer.');
-  }
-}
+
+  static int getRed(int rgbaColor) => rgbaColor >> 24 & 0xFF;
+  static int getGreen(int rgbaColor) => rgbaColor >> 16 & 0xFF;
+  static int getBlue(int rgbaColor) => rgbaColor >> 8 & 0xFF;
 
 }
